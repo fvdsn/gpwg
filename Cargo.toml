@@ -1,8 +1,15 @@
 [package]
 name = "gpwg"
 version = "1.0.0"
+description = "A good password generator"
 authors = ["Frédéric van der Essen"]
 edition = "2021"
+license = "MIT OR Apache-2.0"
+keywords = ["password", "cryptography"]
+categories = ["command-line-utilities", "cryptography"]
+homepage = "https://github.com/fvdsn/gpwg"
+repository = "https://github.com/fvdsn/gpwg"
+readme = "README.md"
 
 [[bin]]
 name = "gpwg"
