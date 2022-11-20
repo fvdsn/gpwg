@@ -36,3 +36,14 @@ In case you find the password too long to type or remember, and cannot use a pas
 manager, consider using the `--weak` option. It produces a shorter password with 56bit
 of entropy, Which is good enough if your password is used in a system with bruteforce
 protection, or uses a second factor of authentication.
+
+## Install
+
+First you need to download & install [rust](https://www.rust-lang.org/tools/install)
+
+Then use cargo to install gpwg.
+
+```
+$ cargo install gpwg
+```
+
