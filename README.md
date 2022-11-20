@@ -67,6 +67,6 @@ First those passwords are not really secure; four random words is about 45bit of
 on modern hardware. `gpwg` passwords are 100bit which is considered to be the minimum to be cryptographically secure.
 
 Another problem with passphrases is that they are often not accepted by the password 'quality' checks that require
-the presence of numbers or special characters. `gpwg` aims to generate passwords that are always be accepted.
+the presence of numbers or special characters. `gpwg` aims to generate passwords that are always accepted.
 
 And last, passphrases use a specific language such as english, and `gpwg` aims to generate universally usable passwords.
