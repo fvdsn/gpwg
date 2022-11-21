@@ -58,6 +58,22 @@ Then use cargo to install gpwg.
 $ cargo install gpwg
 ```
 
+## A word about password entropy
+
+There are two ways to break a password, to steal it or to guess it. Entropy is a measure of how many random guesses on average
+are needed to find the password, and is thus a measure of its security. Entropy increases with length and this is why
+long passwords are recommended. However entropy on its own is not enough because in practice password cracking software
+do not guess passwords randomly, they try specific password patterns first.
+
+Take for example these two passwords: `QSYUNP` and `ZXCVBN`. Those two passwords have the same entropy, but the second one
+corresponds to a row of keys on the querty keyboard, a common password pattern. A password cracking software would try the
+second one first, making it a lot less secure than its entropy would have predicted.
+
+When generating passwords randomly, there is a small probability to generate such a bad password. The chances are very small,
+but the result is catastrophic. Such bad passwords are fortunately easy to detect, because the common patterns used by password
+crackers are well known. `gpwg` uses the `zxcvbn` library to analyse the generated passwords and reject the ones that match
+common patterns, so you only get truly secure passwords.
+
 ## A word about passphrases
 
 Passphrases are passwords made of sentences or sequences of random words -- for example `correct horse battery staple` --
