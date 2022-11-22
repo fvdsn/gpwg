@@ -3,8 +3,7 @@ use clap::{Arg, Command};
 use zxcvbn::zxcvbn;
 use clipboard::ClipboardProvider;
 use clipboard::ClipboardContext;
-use std::{thread, time, cmp};
-use ctrlc;
+use std::{thread, time};
 
 // Constants that control the shape of the generated password
 const WEAK_SIZE: usize = 10;
@@ -53,50 +52,38 @@ const ALL_LETTERS: [char; 59] = [
     '2','3','4','5','6','7','8','9'
 ];
 
-// generate a single password character
-fn gen_letter(rng: &mut rand::rngs::ThreadRng) -> char {
-    let i = rng.gen_range(0..ALL_LETTERS.len());
-    return ALL_LETTERS[i];
-}
-
-// generate an uppercase letter (used for start & finishing letters)
-fn gen_upper(rng: &mut rand::rngs::ThreadRng) -> char {
-    let i = rng.gen_range(0..UPPERS.len());
-    return UPPERS[i];
-}
-
 // check if a password has a number
 fn has_num(pw: &[char]) -> bool {
-    for i in 0..pw.len() {
-        for j in 0..NUMBERS.len() {
-            if pw[i] == NUMBERS[j] {
+    for c in pw {
+        for n in &NUMBERS {
+            if c == n {
                 return true;
             }
         }
     }
-    return false;
+    false
 }
 
 // check if a password has a lowercase letter
 fn has_lower(pw: &[char]) -> bool {
-    for i in 0..pw.len() {
-        for j in 0..LOWERS.len() {
-            if pw[i] == LOWERS[j] {
+    for c in pw {
+        for cl in &LOWERS {
+            if c == cl {
                 return true;
             }
         }
     }
-    return false;
+    false
 }
 
 // check if a password has a special character
 fn has_spec(pw: &[char]) -> bool {
-    for i in 0..pw.len() {
-        if pw[i] == SPEC1 || pw[i] == SPEC2 || pw[i] == SPECSEP {
+    for c in pw {
+        if *c == SPEC1 || *c == SPEC2 || *c == SPECSEP {
             return true;
         }
     }
-    return false;
+    false
 }
 
 // check if a password has a repetition (case insensitive)
@@ -106,7 +93,7 @@ fn has_repeat(pw: &[char]) -> bool {
             return true;
         }
     }
-    return false;
+    false
 }
 
 // check if a password has two special characters in a row
@@ -117,7 +104,19 @@ fn has_morse(pw: &[char]) -> bool {
             return true;
         }
     }
-    return false;
+    false
+}
+
+// generate a single password character
+fn gen_letter(rng: &mut rand::rngs::ThreadRng) -> char {
+    let i = rng.gen_range(0..ALL_LETTERS.len());
+    ALL_LETTERS[i]
+}
+
+// generate an uppercase letter (used for start & finishing letters)
+fn gen_upper(rng: &mut rand::rngs::ThreadRng) -> char {
+    let i = rng.gen_range(0..UPPERS.len());
+    UPPERS[i]
 }
 
 // generate a candidate password
@@ -241,20 +240,16 @@ length and thus strength of the password.
 
     let printout = !m.is_present("copy");
     let length = if m.is_present("length") {
-        match m.value_of("length").unwrap().parse::<usize>() {
-            Ok(n) => n,
-            Err(_) => 0,
-        }
+        m.value_of("length").unwrap().parse::<usize>().unwrap_or(0)
     } else { 0 };
     let strong = m.is_present("strong");
     let default = !strong && m.is_present("default");
     let weak = !default && m.is_present("weak");
 
     // 2) Compute password size based on supplied arguments
-    let size = if length > 0 { cmp::min(MAX_SIZE, cmp::max(WEAK_SIZE, length)) }
+    let size = if length > 0 { length.clamp(WEAK_SIZE, MAX_SIZE) }
        else if strong { STRONG_SIZE }
        else if weak { WEAK_SIZE }
-       else if default { DEFAULT_SIZE }
        else { DEFAULT_SIZE };
 
     let qualifier = if length > 0 { format!("({length}) ") }
@@ -276,7 +271,7 @@ length and thus strength of the password.
     } else {
         // 4.2) Copy password to clipboard
         let mut ctx: ClipboardContext = ClipboardProvider::new().unwrap();
-        ctx.set_contents(pws.to_owned()).unwrap();
+        ctx.set_contents(pws).unwrap();
         println!("Generated password {}sent to the clipboard. Clear & exit with Ctrl-C.", qualifier);
 
         // 4.3) Set Ctrl-C handler so that we can interrupt the 30sec timer
@@ -290,5 +285,119 @@ length and thus strength of the password.
         let expire = time::Duration::from_secs(120);
         thread::sleep(expire);
         ctx.set_contents("".to_owned()).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_has_num_no() {
+        let s: [char; 3] = ['a', 'X', '@'];
+        assert_eq!(has_num(&s), false);
+    }
+
+    #[test]
+    fn test_has_num_yes() {
+        let nums: [char; 8] = [
+            '2','3','4','5','6','7','8','9'
+        ];
+        for n in nums {
+            let s: [char; 3] = ['a', n, '@'];
+            assert!(has_num(&s));
+        }
+    }
+
+    #[test]
+    fn test_has_lower_no() {
+        let s: [char; 4] = ['A', 'X', '@', '4'];
+        assert_eq!(has_lower(&s), false);
+    }
+
+    #[test]
+    fn test_has_lower_yes() {
+        let s: [char; 5] = ['A', 'X', '@', '4', 'b'];
+        assert!(has_lower(&s));
+    }
+
+    #[test]
+    fn test_has_spec_no() {
+        let s: [char; 4] = ['A', 'X', 'a', '4'];
+        assert_eq!(has_spec(&s), false);
+    }
+
+    #[test]
+    fn test_has_spec_at() {
+        let s: [char; 5] = ['A', 'X', 'a', '4', '@'];
+        assert!(has_spec(&s));
+    }
+
+    #[test]
+    fn test_has_spec_bang() {
+        let s: [char; 5] = ['A', '!', 'a', '4', 'X'];
+        assert!(has_spec(&s));
+    }
+
+    #[test]
+    fn test_has_spec_sep() {
+        let s: [char; 5] = ['A', 'X', 'a', '4', '-'];
+        assert!(has_spec(&s));
+    }
+
+    #[test]
+    fn test_has_repeat_empty() {
+        let s: [char; 0] = [];
+        assert_eq!(has_repeat(&s), false);
+    }
+
+    #[test]
+    fn test_has_repeat_single() {
+        let s: [char; 1] = ['x'];
+        assert_eq!(has_repeat(&s), false);
+    }
+
+    #[test]
+    fn test_has_repeat_no() {
+        let s: [char; 2] = ['x','y'];
+        assert_eq!(has_repeat(&s), false);
+    }
+
+    #[test]
+    fn test_has_repeat_no3() {
+        let s: [char; 3] = ['x','y','x'];
+        assert_eq!(has_repeat(&s), false);
+    }
+
+    #[test]
+    fn test_has_repeat_yes() {
+        let s: [char; 2] = ['y','y'];
+        assert!(has_repeat(&s));
+    }
+
+    #[test]
+    fn test_has_repeat_yes3() {
+        let s: [char; 3] = ['!','@','@'];
+        assert!(has_repeat(&s));
+    }
+
+    #[test]
+    fn test_has_morse_empty() {
+        let s: [char; 0] = [];
+        assert_eq!(has_morse(&s), false);
+    }
+
+    #[test]
+    fn test_has_morse_no() {
+        let s: [char; 4] = ['a','@','b','!'];
+        assert_eq!(has_morse(&s), false);
+    }
+
+    #[test]
+    fn test_has_morse_yes() {
+        let s: [char; 4] = ['a', 'b', '@', '!'];
+        assert!(has_morse(&s));
+        let s: [char; 4] = ['a', '!', '@', 'b'];
+        assert!(has_morse(&s));
     }
 }
