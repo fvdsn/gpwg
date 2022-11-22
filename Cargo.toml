@@ -20,6 +20,7 @@ bench = false
 rand = "0.8.0"
 zxcvbn = "2"
 clap = { version = "3.1.6", features = ["derive"] }
-clipboard = "0.5.0"
+clipboard = { git = "https://github.com/xliiv/rust-clipboard", branch = "upgrade-x11" }
+
 ctrlc = "3.2.1"
 
