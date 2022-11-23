@@ -17,6 +17,23 @@ $ gpwg --copy
   ^C
 ```
 
+## Installation
+
+### Pre-compiled binaries
+
+You can find pre-compiled binaries for Windows, Mac and Linux [on the latest release page](https://github.com/fvdsn/gpwg/releases/tag/v1.0.0)
+
+### Compile & install with rust/cargo
+
+First you need to download & install [rust](https://www.rust-lang.org/tools/install)
+
+Then use cargo to install gpwg.
+
+```
+$ cargo install gpwg
+```
+
+## What's good about gpwg's passwords ?
 
 The generated password has the following properties:
 
@@ -48,28 +65,17 @@ might look at your screen or watch your terminal logs, you can use the `--copy` 
 copies the password to the clipboard. The clipboard is then cleared when you exit `gpwg` with
 `Ctrl-C`
 
-## Installation
-
-First you need to download & install [rust](https://www.rust-lang.org/tools/install)
-
-Then use cargo to install gpwg.
-
-```
-$ cargo install gpwg
-```
-
 ## A word about password entropy
 
-There are two ways to break a password, to steal it or to guess it. Entropy is a measure of how many random guesses on average
-are needed to find the password, and is thus a measure of its security. Entropy increases with length and this is why
-long passwords are recommended. However entropy on its own is not enough because in practice password cracking software
+Entropy is a measure of how many random guesses on average are needed to find the
+password, and is thus a measure of its security. However in practice password cracking softwares
 do not guess passwords randomly, they try specific password patterns first.
 
 Take for example these two passwords: `QSYUNP` and `ZXCVBN`. Those two passwords have the same entropy, but the second one
 corresponds to a row of keys on the querty keyboard, a common password pattern. A password cracking software would try the
 second one first, making it a lot less secure than its entropy would have predicted.
 
-When generating passwords randomly, there is a small probability to generate such a bad password. The chances are very small,
+When generating passwords, there is a small probability to generate such a bad password. The chances are very small,
 but the result is catastrophic. Such bad passwords are fortunately easy to detect, because the common patterns used by password
 crackers are well known. `gpwg` uses the `zxcvbn` library to analyse the generated passwords and reject the ones that match
 common patterns, so you only get truly secure passwords.
