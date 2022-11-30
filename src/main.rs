@@ -162,17 +162,14 @@ fn pwgen(rng: &mut rand::rngs::ThreadRng, chars: &mut[char]) {
         if has_morse(chars) {
             continue;
         }
-        if !strong {
-            // zxcvbn checks for weak passwords
-            // we skip that check for strong ones as it will never fail.
-            // Passwords of length less than 11 cannot
-            // produce scores of 4, so we are less strict with those
-            let minscore = if chars.len() < 11 {3} else {4};
-            let pws: String = chars.iter().collect();
-            let estimate = zxcvbn(&pws, &[]).unwrap();
-            if estimate.score() < minscore {
-                continue;
-            }
+        // zxcvbn checks for weak passwords by finding words and other
+        // patterns in them and returns a list of those patterns as a
+        // 'sequence'. We only accept passwords with a single 'bruteforce'
+        // element in the sequence.
+        let pws: String = chars.iter().collect();
+        let estimate = zxcvbn(&pws, &[]).unwrap();
+        if estimate.sequence().len() > 1 {
+            continue;
         }
         break;
     }
