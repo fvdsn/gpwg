@@ -5,11 +5,12 @@ use clipboard::ClipboardProvider;
 use clipboard::ClipboardContext;
 use std::{thread, time};
 
+
 // Constants that control the shape of the generated password
-const WEAK_SIZE: usize = 10;
 const STRONG_SIZE: usize = 32;
 const DEFAULT_SIZE: usize = 18;
-const MAX_SIZE: usize = 128;
+const MIN_SIZE: usize = 8;
+const MAX_SIZE: usize = 104;
 
 // The two special characters
 //  - accepted by most password restrictions
@@ -21,6 +22,9 @@ const SPEC2: char = '@';
 
 // Block separator for long passwords
 const SPECSEP: char = '-';
+// Size of blocks for long passwords
+const SPECSEP_BLOCKSIZE: usize = 8;
+const SPECSEP_MINSIZE: usize = 24;
 
 // List of number charcters
 // 1 and 0 have been removed as they look similar to l,I and O
@@ -51,6 +55,56 @@ const ALL_LETTERS: [char; 59] = [
     SPEC1, SPEC2,
     '2','3','4','5','6','7','8','9'
 ];
+
+// map of password length to entropy
+const PW_ENTROPY: [[usize; 2]; 25] = [
+    [8,41],
+    [9,47],
+    [10,53],
+    [11,59],
+    [12,65],
+    [13,71],
+    [14,77],
+    [15,83],
+    [16,89],
+    [17,95],
+    [18,101],
+    [19,107],
+    [20,113],
+    [21,119],
+    [24,125],
+    [32,166],
+    [40,207],
+    [48,248],
+    [56,289],
+    [64,330],
+    [72,371],
+    [80,412],
+    [88,453],
+    [96,494],
+    [104,535],
+];
+
+fn entropy_to_pwlen(entropy: usize) -> usize {
+    if entropy <= PW_ENTROPY[0][1] {
+        PW_ENTROPY[0][0]
+    } else {
+        for i in 0..(PW_ENTROPY.len()-1) {
+            if entropy > PW_ENTROPY[i][1] && entropy <= PW_ENTROPY[i+1][1] {
+                return PW_ENTROPY[i+1][0];
+            }
+        }
+        PW_ENTROPY[PW_ENTROPY.len()-1][0]
+    }
+}
+
+fn uppers_entropy() -> f64 {
+    (UPPERS.len() as f64).log2()
+}
+
+fn all_letters_entropy() -> f64 {
+    (ALL_LETTERS.len() as f64).log2()
+}
 
 // check if a password has a number
 fn has_num(pw: &[char]) -> bool {
@@ -126,27 +180,54 @@ fn gen_candidate(rng: &mut rand::rngs::ThreadRng, arr: &mut[char]) {
         arr[i] = gen_letter(rng);
     }
     arr[arr.len()-1] = gen_upper(rng);
-}
 
-// generate a candidate password with '-' separated blocks
-fn gen_big_candidate(rng: &mut rand::rngs::ThreadRng, arr: &mut[char]) {
-    gen_candidate(rng, arr);
-    for i in 1..arr.len()-1 {
-        if i % 8 == 0 {
-            arr[i] = SPECSEP;
+    // put block separator for long passwords
+    if arr.len() >= SPECSEP_MINSIZE {
+        for i in 1..arr.len()-1 {
+            if i % SPECSEP_BLOCKSIZE == 0 {
+                arr[i] = SPECSEP;
+            }
         }
     }
 }
 
-// generate a good password
-fn pwgen(rng: &mut rand::rngs::ThreadRng, chars: &mut[char]) {
-    let strong = chars.len() >= STRONG_SIZE;
-    loop {
-        if strong {
-            gen_big_candidate(rng, chars);
-        } else {
-            gen_candidate(rng, chars);
+fn candidate_specsep_count(len: usize) -> usize {
+    let mut count: usize = 0;
+    if len < SPECSEP_MINSIZE {
+        return 0;
+    }
+    for i in 1..(len-1) {
+        if i % SPECSEP_BLOCKSIZE == 0 {
+            count += 1;
         }
+    }
+    count
+}
+
+fn candidate_entropy(len: usize) -> f64 {
+    if len <= 2 {
+        uppers_entropy() * (len as f64)
+    } else {
+        let lettercount = len - 2 - candidate_specsep_count(len);
+        uppers_entropy() * 2.0 + all_letters_entropy() * (lettercount as f64)
+    }
+}
+
+fn pw_entropy(candidate_entropy: f64, candidate_count: usize) -> f64 {
+    candidate_entropy - (candidate_count as f64).log2()
+}
+
+// generate a good password, returns its entropy
+fn pwgen(rng: &mut rand::rngs::ThreadRng, chars: &mut[char]) -> f64 {
+    let pwlen = chars.len();
+    let candidate_entropy = candidate_entropy(pwlen);
+    let mut candidate_count: usize = 0;
+
+    loop {
+        gen_candidate(rng, chars);
+
+        candidate_count += 1;
+
         if !has_num(chars) {
             continue;
         }
@@ -173,6 +254,8 @@ fn pwgen(rng: &mut rand::rngs::ThreadRng, chars: &mut[char]) {
         }
         break;
     }
+
+    pw_entropy(candidate_entropy, candidate_count)
 }
 
 fn main() {
@@ -180,39 +263,18 @@ fn main() {
     // 1) Declare & Parse command line arguments
     let m = Command::new("gpwg")
         .version("1.0")
-        .about("Generates a good password and copies it to the clipboard.")
+        .about("Generates good passwords.")
         .long_about("
-Generates a good password and prints it to stdout.
-
-Consider using the --copy option to copy it to the clipboard 
-to avoid leaking it unintentionally.
-
-The --strong, --weak, --default, --length=N options control the
-length and thus strength of the password.
+This program generates a good password with 18 characters and 100 bits of entropy by default.
+Consider using the --copy option to copy it to the clipboard to avoid unintentional leaks.
         ")
         .author("Frédéric van der Essen")
-        .arg(
-            Arg::new("weak")
-                .long("weak")
-                .short('w')
-                .takes_value(false)
-                .help("10 characters, 54bit of entropy")
-                .required(false)
-        )
         .arg(
             Arg::new("strong")
                 .long("strong")
                 .short('s')
                 .takes_value(false)
-                .help("32 characters, 160bit of entropy")
-                .required(false)
-        )
-        .arg(
-            Arg::new("default")
-                .long("default")
-                .short('d')
-                .takes_value(false)
-                .help("18 characters, 100bit of entropy")
+                .help("Generates a strong password with 32 characters and 160 bits of entropy")
                 .required(false)
         )
         .arg(
@@ -221,7 +283,16 @@ length and thus strength of the password.
                 .short('l')
                 .takes_value(true)
                 .forbid_empty_values(true)
-                .help("Sets password length [10, 128]")
+                .help("Sets password length (10-128)")
+                .required(false)
+        )
+        .arg(
+            Arg::new("entropy")
+                .long("entropy")
+                .short('e')
+                .takes_value(true)
+                .forbid_empty_values(true)
+                .help("Sets password entropy in bits (40-512)")
                 .required(false)
         )
         .arg(
@@ -229,56 +300,58 @@ length and thus strength of the password.
                 .long("copy")
                 .short('c')
                 .takes_value(false)
-                .help("Copy the password to clipboard.")
+                .help("Copies the password to clipboard.")
                 .required(false)
         )
         .after_help("")
         .get_matches();
 
     let printout = !m.is_present("copy");
-    let length = if m.is_present("length") {
+
+    // 1) Deduct password size based on arguments
+    let mut desired_length = if m.is_present("length") {
         m.value_of("length").unwrap().parse::<usize>().unwrap_or(0)
     } else { 0 };
-    let strong = m.is_present("strong");
-    let default = !strong && m.is_present("default");
-    let weak = !default && m.is_present("weak");
 
-    // 2) Compute password size based on supplied arguments
-    let size = if length > 0 { length.clamp(WEAK_SIZE, MAX_SIZE) }
-       else if strong { STRONG_SIZE }
-       else if weak { WEAK_SIZE }
-       else { DEFAULT_SIZE };
+    if m.is_present("entropy") {
+        let entropy = m.value_of("entropy").unwrap().parse::<usize>().unwrap_or(0);
+        if entropy > 0 {
+            desired_length = entropy_to_pwlen(entropy).max(desired_length);
+        }
+    }
+    if m.is_present("strong") {
+        desired_length = desired_length.max(STRONG_SIZE);
+    }
+    if desired_length == 0 {
+        desired_length = DEFAULT_SIZE;
+    }
 
-    let qualifier = if length > 0 { format!("({length}) ") }
-        else if strong { "(strong) ".to_owned() }
-        else if weak { "(weak) ".to_owned() }
-        else if default { "(default)".to_owned() }
-        else { "".to_owned() };
-    
-    // 3) Compute password of specified size
+    desired_length = desired_length.clamp(MIN_SIZE, MAX_SIZE);
+
+    // 2) Compute password of specified size
     let mut rng = rand::thread_rng();
-    let mut pw = vec!['_'; size];
+    let mut pw = vec!['_'; desired_length];
     pwgen(&mut rng, &mut pw);
     let pws: String = pw.iter().collect();
 
-    // 4) Depending on options, either print password or copy it to clipboard
+    // 3) Depending on options, either print password or copy it to clipboard
     if printout {
-        // 4.1) Output password to stdout
+        // 3.1) Output password to stdout
         println!("{}", pws);
     } else {
-        // 4.2) Copy password to clipboard
+        // 3.2) Copy password to clipboard
         let mut ctx: ClipboardContext = ClipboardProvider::new().unwrap();
         ctx.set_contents(pws).unwrap();
-        println!("Generated password {}sent to the clipboard. Clear & exit with Ctrl-C.", qualifier);
+        println!("Generated password sent to the clipboard. Clear & exit with Ctrl-C.");
 
-        // 4.3) Set Ctrl-C handler so that we can interrupt the 30sec timer
+        // 3.3) Set Ctrl-C handler so that we can interrupt the 30sec timer
         ctrlc::set_handler(move || {
             let mut ctx: ClipboardContext = ClipboardProvider::new().unwrap();
             ctx.set_contents("".to_owned()).unwrap();
             std::process::exit(0);
         }).expect("Error setting Ctrl-C handler");
 
-        // 4.4) Wait 30sec then clear password
+        // 3.4) Wait 2min then clear password
         let expire = time::Duration::from_secs(120);
         thread::sleep(expire);
         ctx.set_contents("".to_owned()).unwrap();
@@ -288,6 +361,7 @@ length and thus strength of the password.
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashSet;
 
     #[test]
     fn test_has_num_no() {
@@ -396,5 +470,74 @@ mod tests {
         assert!(has_morse(&s));
         let s: [char; 4] = ['a', '!', '@', 'b'];
         assert!(has_morse(&s));
+    }
+
+    #[test]
+    fn test_specsep_count() {
+        let mut rng = rand::thread_rng();
+        for len in MIN_SIZE..MAX_SIZE {
+            let specsep_count = candidate_specsep_count(len);
+            let mut pw = vec!['_'; len];
+            pwgen(&mut rng, &mut pw);
+            let mut count: usize = 0;
+            for c in pw {
+                if c == SPECSEP {
+                    count += 1;
+                }
+            }
+            assert_eq!(specsep_count, count);
+        }
+    }
+
+    #[test]
+    fn test_randomness() {
+        // generate 10 thousand passwords and check they all differ.
+        let len: usize = DEFAULT_SIZE;
+        let samples: usize = 10000;
+        let mut pwds = HashSet::new();
+        let mut rng = rand::thread_rng();
+        for _ in 1..samples {
+            let mut pw = vec!['_'; len];
+            pwgen(&mut rng, &mut pw);
+            let pws: String = pw.iter().collect();
+            assert!(!pwds.contains(&pws));
+            pwds.insert(pws);
+        }
+    }
+
+    #[test]
+    fn test_entropy() {
+        let samples: usize = 1000;
+        let mut rng = rand::thread_rng();
+        for pw_len_entr in PW_ENTROPY {
+            let len = pw_len_entr[0];
+            let entr = pw_len_entr[1];
+            let mut entropy: f64 = 0.0;
+            for _ in 1..samples {
+                let mut pw = vec!['_'; len];
+                entropy += pwgen(&mut rng, &mut pw);
+            }
+            entropy = entropy / (samples as f64);
+            println!("{};{}", len, entropy as i32);
+            assert!(entropy >= (entr-1) as f64);
+        }
+    }
+
+    #[test]
+    #[ignore]
+    fn test_entropy() {
+        // this 'test' is used to generate a list of password length and their entropy
+        println!("pw_len;entropy");
+        let samples: usize = 1000;
+        let mut rng = rand::thread_rng();
+        for len in 8..128 {
+            let mut entropy: f64 = 0.0;
+            for _ in 1..samples {
+                let mut pw = vec!['_'; len];
+                entropy += pwgen(&mut rng, &mut pw);
+            }
+            entropy = entropy / (samples as f64);
+            println!("{};{}", len, entropy as i32);
+        }
     }
 }
