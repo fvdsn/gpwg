@@ -525,7 +525,7 @@ mod tests {
 
     #[test]
     #[ignore]
-    fn test_entropy() {
+    fn test_generate_entropy_csv() {
         // this 'test' is used to generate a list of password length and their entropy
         println!("pw_len;entropy");
         let samples: usize = 1000;
