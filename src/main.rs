@@ -261,7 +261,7 @@ fn main() {
 
     // 1) Declare & Parse command line arguments
     let m = Command::new("gpwg")
-        .version("1.1.0")
+        .version("1.2.0")
         .about("Generates good passwords.")
         .long_about("
 This program generates a good password with 18 characters and 100 bits of entropy by default.
