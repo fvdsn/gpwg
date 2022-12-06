@@ -526,7 +526,7 @@ mod tests {
     #[ignore]
     fn test_generate_entropy_csv() {
         // this 'test' is used to generate a list of password length and their entropy
-        println!("pw_len;entropy");
+        println!("pw_len,entropy");
         let samples: usize = 1000;
         let mut rng = rand::thread_rng();
         for len in 8..128 {
@@ -536,7 +536,7 @@ mod tests {
                 entropy += pwgen(&mut rng, &mut pw);
             }
             entropy = entropy / (samples as f64);
-            println!("{};{}", len, entropy as i32);
+            println!("{},{}", len, entropy as i32);
         }
     }
 }
