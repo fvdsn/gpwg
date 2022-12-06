@@ -1,8 +1,7 @@
 use rand::Rng;
 use clap::{Arg, Command};
 use zxcvbn::zxcvbn;
-use clipboard::ClipboardProvider;
-use clipboard::ClipboardContext;
+use cli_clipboard::{ClipboardContext, ClipboardProvider};
 use std::{thread, time};
 
 
