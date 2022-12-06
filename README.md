@@ -26,7 +26,7 @@ $ gpwg --copy
 
 ### Pre-compiled binaries
 
-You can find pre-compiled binaries for Windows, Mac and Linux [on the latest release](https://github.com/fvdsn/gpwg/releases/tag/v1.0.0)
+You can find pre-compiled binaries for Windows, Mac and Linux [on the latest release](https://github.com/fvdsn/gpwg/releases/tag/v1.1.0)
 
 ### Compiling with Rust/Cargo
 
