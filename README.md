@@ -40,17 +40,18 @@ $ cargo install gpwg
 
 GPWG passwords have the following properties:
 
-- Accepted by all password inputs
 - 100bit of entropy by default (strong enough for most use cases)
-- Compliant with NIST, Microsoft, IBM, ANSSI, CNIL guidelines
+- Accepted by all password inputs
 - Always include uppercase and lowercase letters, numbers and special characters
-- No confusing sequences of characters
+- No confusing sequences of characters (`1IlO0`, key repeats, etc.)
 - No dictionary words or common password patterns
 - Maximum score on the zxcvbn password checker
+- Generated offline
 - Always start with an uppercase letter to prevent mistyping on smartphones
 - Special characters `!@` are easy to type on most on-screen keyboards,
   do not interfere with text encoding, and are accepted by most
   password inputs with special character restrictions.
+- Compliant with NIST, Microsoft, IBM, ANSSI, CNIL guidelines
 
 In case 100bit of entropy is not enough, the `--strong` option generates a longer
 password with 160 bits of entropy suitable for cryptography. If 160 bits are still 
