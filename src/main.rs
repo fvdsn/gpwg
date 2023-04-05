@@ -295,6 +295,15 @@ Consider using the --copy option to copy it to the clipboard to avoid unintentio
                 .required(false)
         )
         .arg(
+            Arg::new("num")
+                .long("num")
+                .short('n')
+                .takes_value(true)
+                .forbid_empty_values(true)
+                .help("Generates 'num' passwords (1-MAX_INT)")
+                .required(false)
+        )
+        .arg(
             Arg::new("copy")
                 .long("copy")
                 .short('c')
@@ -305,11 +314,11 @@ Consider using the --copy option to copy it to the clipboard to avoid unintentio
         .after_help("")
         .get_matches();
 
-    let printout = !m.is_present("copy");
+    let clipboard = m.is_present("copy");
 
     // 1) Deduct password size based on arguments
     let mut desired_length = if m.is_present("length") {
-        m.value_of("length").unwrap().parse::<usize>().unwrap_or(0)
+        m.value_of("length").unwrap().parse::<usize>().unwrap()
     } else { 0 };
 
     if m.is_present("entropy") {
@@ -327,20 +336,35 @@ Consider using the --copy option to copy it to the clipboard to avoid unintentio
 
     desired_length = desired_length.clamp(MIN_SIZE, MAX_SIZE);
 
+    // 1.1) Extract number of password
+    let num = if m.is_present("num") {
+        m.value_of("num").unwrap().parse::<usize>().unwrap_or(1).clamp(1, usize::MAX)
+    } else {
+        1
+    };
+
     // 2) Compute password of specified size
     let mut rng = rand::thread_rng();
-    let mut pw = vec!['_'; desired_length];
-    pwgen(&mut rng, &mut pw);
-    let pws: String = pw.iter().collect();
+    let mut cbpws = String::new();
 
-    // 3) Depending on options, either print password or copy it to clipboard
-    if printout {
-        // 3.1) Output password to stdout
-        println!("{}", pws);
-    } else {
+    for n in 0..num {
+        let mut pw = vec!['_'; desired_length];
+        pwgen(&mut rng, &mut pw);
+        let pws: String = pw.iter().collect();
+        if clipboard {
+            cbpws.push_str(&pws);
+            if n != num -1 {
+                cbpws.push_str("\n");
+            }
+        } else {
+            println!("{}", pws);
+        }
+    }
+
+    if clipboard {
         // 3.2) Copy password to clipboard
         let mut ctx: ClipboardContext = ClipboardProvider::new().unwrap();
-        ctx.set_contents(pws).unwrap();
+        ctx.set_contents(cbpws).unwrap();
         println!("Generated password sent to the clipboard. Clear & exit with Ctrl-C.");
 
         // 3.3) Set Ctrl-C handler so that we can interrupt the 30sec timer
